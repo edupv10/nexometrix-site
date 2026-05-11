@@ -515,7 +515,7 @@ function ContactPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Name" name="name" required placeholder="Eduardo Pérez" value={form.name} onChange={handleChange} />
+                <Field label="Name" name="name" required placeholder="Juan Pérez" value={form.name} onChange={handleChange} />
                 <Field label="Company" name="company" required placeholder="Company name" value={form.company} onChange={handleChange} />
                 <Field label="Email" name="email" type="email" required placeholder="you@company.com" value={form.email} onChange={handleChange} />
                 <Field label="Country" name="country" placeholder="Mexico / United States" value={form.country} onChange={handleChange} />
