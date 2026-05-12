@@ -451,22 +451,61 @@ function ContactPage() {
     message: "",
   });
 
-  const mailtoHref = useMemo(() => {
-    const subject = encodeURIComponent(`Data Audit Request - ${form.company || form.name || "New Lead"}`);
-    const body = encodeURIComponent(
-      `Name: ${form.name}\nCompany: ${form.company}\nEmail: ${form.email}\nCountry: ${form.country}\nWebsite: ${form.website}\n\nData type: ${form.dataType}\nData source: ${form.dataSource}\nNeeds help with: ${form.helpType}\nUrgency: ${form.urgency}\nBudget: ${form.budget}\n\nProject details:\n${form.message}`
-    );
-    return `mailto:hello@nexometrix.com?subject=${subject}&body=${body}`;
-  }, [form]);
+  const [status, setStatus] = useState("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const isSubmitting = status === "submitting";
+  const isSuccess = status === "success";
+  const scriptUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
 
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    window.location.href = mailtoHref;
+    setStatus("submitting");
+    setErrorMessage("");
+
+    if (!scriptUrl) {
+      setStatus("error");
+      setErrorMessage("Google Script URL is missing. Add VITE_GOOGLE_SCRIPT_URL to your .env file.");
+      return;
+    }
+
+    try {
+      await fetch(scriptUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+        },
+        body: JSON.stringify({
+          ...form,
+          source: "Nexometrix Website",
+          submittedAt: new Date().toISOString(),
+        }),
+      });
+
+      setStatus("success");
+      setForm({
+        name: "",
+        company: "",
+        email: "",
+        country: "",
+        website: "",
+        dataType: "",
+        dataSource: "",
+        helpType: "",
+        urgency: "",
+        budget: "",
+        message: "",
+      });
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage("Something went wrong while submitting the form. Please try again or email hello@nexometrix.com.");
+    }
   }
 
   return (
@@ -499,9 +538,13 @@ function ContactPage() {
             </div>
 
             <Card className="mt-10 border-white/10 bg-white/5 p-6">
-              <p className="text-sm font-medium text-cyan-200">Prefer email?</p>
-              <p className="mt-2 text-slate-300">You can also reach us directly at:</p>
-              <a href="mailto:hello@nexometrix.com" className="mt-3 inline-flex text-lg font-semibold text-white hover:text-cyan-200">
+              <p className="text-sm font-medium text-cyan-200">What happens after you submit?</p>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+                <p>1. Your request is saved in our lead tracker.</p>
+                <p>2. We review your current tools, data sources and business need.</p>
+                <p>3. We contact you with the recommended next step.</p>
+              </div>
+              <a href="mailto:hello@nexometrix.com" className="mt-5 inline-flex text-sm font-semibold text-white hover:text-cyan-200">
                 hello@nexometrix.com
               </a>
             </Card>
@@ -510,38 +553,63 @@ function ContactPage() {
           <Card className="border-white/10 bg-white/10 p-6 backdrop-blur md:p-8">
             <div className="mb-8">
               <h2 className="text-2xl font-bold">Project intake</h2>
-              <p className="mt-2 text-slate-300">This form currently opens your email app with a structured request. Later, we can connect it to Tally, Formspree, HubSpot or a database.</p>
+              <p className="mt-2 text-slate-300">Submit your information directly through the website. We’ll use it to qualify the opportunity and prepare the first diagnostic.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Name" name="name" required placeholder="Juan Pérez" value={form.name} onChange={handleChange} />
-                <Field label="Company" name="company" required placeholder="Company name" value={form.company} onChange={handleChange} />
-                <Field label="Email" name="email" type="email" required placeholder="you@company.com" value={form.email} onChange={handleChange} />
-                <Field label="Country" name="country" placeholder="Mexico / United States" value={form.country} onChange={handleChange} />
-                <Field label="Website" name="website" placeholder="https://company.com" value={form.website} onChange={handleChange} />
-                <SelectField label="What data do you work with?" name="dataType" required value={form.dataType} onChange={handleChange} options={dataTypes} />
-                <SelectField label="Where is your data stored?" name="dataSource" required value={form.dataSource} onChange={handleChange} options={dataSources} />
-                <SelectField label="What do you need help with?" name="helpType" required value={form.helpType} onChange={handleChange} options={helpTypes} />
-                <SelectField label="How urgent is this?" name="urgency" value={form.urgency} onChange={handleChange} options={urgencyOptions} />
-                <SelectField label="Estimated budget" name="budget" value={form.budget} onChange={handleChange} options={budgetOptions} />
+            {isSuccess ? (
+              <div className="rounded-3xl border border-cyan-300/30 bg-cyan-300/10 p-8 text-center">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-300 text-2xl text-slate-950">✓</div>
+                <h3 className="text-2xl font-bold">Request received</h3>
+                <p className="mt-3 leading-7 text-slate-300">
+                  Thanks for reaching out. We’ll review your information and contact you soon at the email you provided.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStatus("idle")}
+                  className="mt-6 rounded-2xl border border-white/15 bg-white/5 px-6 py-3 font-semibold text-white hover:bg-white/10"
+                >
+                  Submit another request
+                </button>
               </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <Field label="Name" name="name" required placeholder="Eduardo Pérez" value={form.name} onChange={handleChange} />
+                  <Field label="Company" name="company" required placeholder="Company name" value={form.company} onChange={handleChange} />
+                  <Field label="Email" name="email" type="email" required placeholder="you@company.com" value={form.email} onChange={handleChange} />
+                  <Field label="Country" name="country" placeholder="Mexico / United States" value={form.country} onChange={handleChange} />
+                  <Field label="Website" name="website" placeholder="https://company.com" value={form.website} onChange={handleChange} />
+                  <SelectField label="What data do you work with?" name="dataType" required value={form.dataType} onChange={handleChange} options={dataTypes} />
+                  <SelectField label="Where is your data stored?" name="dataSource" required value={form.dataSource} onChange={handleChange} options={dataSources} />
+                  <SelectField label="What do you need help with?" name="helpType" required value={form.helpType} onChange={handleChange} options={helpTypes} />
+                  <SelectField label="How urgent is this?" name="urgency" value={form.urgency} onChange={handleChange} options={urgencyOptions} />
+                  <SelectField label="Estimated budget" name="budget" value={form.budget} onChange={handleChange} options={budgetOptions} />
+                </div>
 
-              <TextArea
-                label="Tell us about your current reporting or data problem"
-                name="message"
-                required
-                placeholder="Example: We manually update sales reports every Monday using spreadsheets from multiple branches. We want a dashboard that updates automatically."
-                value={form.message}
-                onChange={handleChange}
-              />
+                <TextArea
+                  label="Tell us about your current reporting or data problem"
+                  name="message"
+                  required
+                  placeholder="Example: We manually update sales reports every Monday using spreadsheets from multiple branches. We want a dashboard that updates automatically."
+                  value={form.message}
+                  onChange={handleChange}
+                />
 
-              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
-                By submitting, your email app will open with the project details pre-filled. You can review before sending.
-              </div>
+                {status === "error" && (
+                  <div className="rounded-2xl border border-red-300/30 bg-red-400/10 p-4 text-sm leading-6 text-red-100">
+                    {errorMessage}
+                  </div>
+                )}
 
-              <Button type="submit" className="w-full">Submit Data Audit Request</Button>
-            </form>
+                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
+                  Your information will be stored securely in our internal lead tracker and used only to respond to your request.
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Submit Data Audit Request"}
+                </Button>
+              </form>
+            )}
           </Card>
         </div>
       </section>
